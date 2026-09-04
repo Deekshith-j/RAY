@@ -202,6 +202,14 @@ class AuditLog(Base):
     evidence: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
     confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
+    # Audit Event Metadata per Section 8
+    correlation_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    agent_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    event_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    input_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    output_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    policy_version: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
     policy_result: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # PASSED, REJECTED, APPROVAL_REQUIRED
     approval_required: Mapped[bool] = mapped_column(Boolean, default=False)
     approved_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
@@ -252,12 +260,17 @@ class RecoveryDecision(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     case_id: Mapped[str] = mapped_column(String(64), ForeignKey("recovery_cases.id"), nullable=False, index=True)
     prediction_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("recovery_predictions.id"), nullable=True)
+    agent_run_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    strategy: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     recommended_strategy: Mapped[str] = mapped_column(String(64), nullable=False)
     probability_of_recovery: Mapped[float] = mapped_column(Float, nullable=False)
     expected_recovery: Mapped[float] = mapped_column(Float, nullable=False)
     rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    policy_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    policy_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     policy_result: Mapped[str] = mapped_column(String(32), nullable=False)  # ALLOW, REQUIRE_HUMAN_APPROVAL, DENY
-    policy_version: Mapped[str] = mapped_column(String(32), default="v1.0")
+    policy_version: Mapped[str] = mapped_column(String(32), default="ray-policy-v1")
     authorization_required: Mapped[bool] = mapped_column(Boolean, default=False)
     authorization_status: Mapped[str] = mapped_column(String(32), default="PENDING")  # PENDING, AUTHORIZED, REJECTED
     authorized_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
@@ -274,10 +287,12 @@ class ExecutionRecord(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     case_id: Mapped[str] = mapped_column(String(64), ForeignKey("recovery_cases.id"), nullable=False, index=True)
     decision_id: Mapped[str] = mapped_column(String(64), ForeignKey("recovery_decisions.id"), nullable=False, index=True)
+    strategy: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     tool_name: Mapped[str] = mapped_column(String(64), nullable=False)
     operation: Mapped[str] = mapped_column(String(64), nullable=False)
     request_id: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
+    authorization_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     provider_reference: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     execution_status: Mapped[str] = mapped_column(String(32), nullable=False)  # SUCCESS, FAILED, PENDING
     provider_response_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -294,6 +309,9 @@ class VerificationRecord(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     case_id: Mapped[str] = mapped_column(String(64), ForeignKey("recovery_cases.id"), nullable=False, index=True)
     execution_id: Mapped[str] = mapped_column(String(64), ForeignKey("execution_records.id"), nullable=False, index=True)
+    api_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    webhook_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    signals_agree: Mapped[bool] = mapped_column(Boolean, default=False)
     webhook_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     api_state_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     provider_status: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -301,6 +319,8 @@ class VerificationRecord(Base):
     verification_status: Mapped[str] = mapped_column(String(32), nullable=False)  # PENDING, VERIFIED, CONFLICT, FAILED
     verification_method: Mapped[str] = mapped_column(String(64), default="dual_signal_api_webhook")
     evidence_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    api_evidence_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    webhook_evidence_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     evidence_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
     verification_timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     correlation_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
