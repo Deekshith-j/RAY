@@ -1,0 +1,136 @@
+{
+  "model_version": "ray-recov-v1-202609040629",
+  "model_type": "Logistic Regression + Sigmoid Calibration",
+  "is_calibrated": true,
+  "calibration_method": "sigmoid",
+  "training_timestamp": "2026-09-04T06:29:31.271892",
+  "training_seed": 42,
+  "dataset_version": "synthetic-50k-v1",
+  "dataset_hash": "3596b33fcebecaa2",
+  "feature_list": [
+    "amount",
+    "customer_age_days",
+    "previous_payment_count",
+    "successful_payment_count",
+    "failed_payment_count",
+    "customer_success_rate",
+    "retry_count",
+    "merchant_baseline_failure_rate",
+    "subscription_age_days",
+    "customer_lifetime_value",
+    "failure_type",
+    "payment_method",
+    "entity_type"
+  ],
+  "train_size": 103,
+  "validation_size": 23,
+  "test_size": 24,
+  "validation_metrics": {
+    "roc_auc": 0.7197,
+    "pr_auc": 0.7539,
+    "precision": 0.6923,
+    "recall": 0.75,
+    "f1": 0.72,
+    "brier_score": 0.2159,
+    "log_loss": 0.6222,
+    "confusion_matrix": [
+      [
+        7,
+        4
+      ],
+      [
+        3,
+        9
+      ]
+    ],
+    "operating_thresholds": {
+      "0.5": {
+        "precision": 0.6923,
+        "recall": 0.75,
+        "f1": 0.72,
+        "predicted_positive_rate": 0.5652
+      },
+      "0.6": {
+        "precision": 0.6,
+        "recall": 0.5,
+        "f1": 0.5455,
+        "predicted_positive_rate": 0.4348
+      },
+      "0.75": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "predicted_positive_rate": 0.0
+      },
+      "0.85": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "predicted_positive_rate": 0.0
+      }
+    },
+    "revenue_weighted_recall": null,
+    "revenue_at_risk": null,
+    "recovered_revenue": null,
+    "revenue_recovery_rate": null,
+    "expected_recovery": null,
+    "average_recovery_amount": null
+  },
+  "test_metrics": {
+    "roc_auc": 0.9185,
+    "pr_auc": 0.9377,
+    "precision": 0.9,
+    "recall": 0.6,
+    "f1": 0.72,
+    "brier_score": 0.168,
+    "log_loss": 0.5064,
+    "confusion_matrix": [
+      [
+        8,
+        1
+      ],
+      [
+        6,
+        9
+      ]
+    ],
+    "operating_thresholds": {
+      "0.5": {
+        "precision": 0.9,
+        "recall": 0.6,
+        "f1": 0.72,
+        "predicted_positive_rate": 0.4167
+      },
+      "0.6": {
+        "precision": 0.8571,
+        "recall": 0.4,
+        "f1": 0.5455,
+        "predicted_positive_rate": 0.2917
+      },
+      "0.75": {
+        "precision": 1.0,
+        "recall": 0.1333,
+        "f1": 0.2353,
+        "predicted_positive_rate": 0.0833
+      },
+      "0.85": {
+        "precision": 1.0,
+        "recall": 0.0667,
+        "f1": 0.125,
+        "predicted_positive_rate": 0.0417
+      }
+    },
+    "revenue_weighted_recall": null,
+    "revenue_at_risk": null,
+    "recovered_revenue": null,
+    "revenue_recovery_rate": null,
+    "expected_recovery": null,
+    "average_recovery_amount": null
+  },
+  "library_versions": {
+    "python": "3.11.9",
+    "sklearn": "1.9.0",
+    "numpy": "2.4.6",
+    "xgboost": "3.2.0"
+  }
+}
