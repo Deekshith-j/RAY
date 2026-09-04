@@ -1,108 +1,73 @@
-# RAY — Revenue Autonomy Engine: Architecture Specification
+# RAY System Architecture
 
-## 1. System Architecture
+## 1. Core Architectural Principle
 
-RAY functions as an **autonomous financial recovery control plane** for Razorpay merchants.
-It is built upon a strict, non-negotiable architectural separation:
+The central invariant of RAY is:
 
-$$\mathbf{PREDICTION} \neq \mathbf{RECOMMENDATION} \neq \mathbf{AUTHORIZATION} \neq \mathbf{EXECUTION} \neq \mathbf{VERIFICATION}$$
+$$\text{PREDICTION} \neq \text{RECOMMENDATION} \neq \text{POLICY AUTHORIZATION} \neq \text{EXECUTION} \neq \text{INDEPENDENT VERIFICATION} \neq \text{VERIFIED REVENUE}$$
+
+Every layer has a strictly bounded responsibility. Advisory components cannot authorize or execute; execution components cannot verify; only independent verification can mark revenue as recovered.
+
+---
+
+## 2. Conceptual Workflow Diagram
 
 ```mermaid
 flowchart TD
-    CASE[Payment Failure / Inactive Subscription]
-
-    ML[Recoverability ML Pipeline<br/>Customer-Grouped Isolation]
-    DET[Agent 1: Revenue Detective<br/>Opportunity Analysis]
-    DIAG[Agent 2: Diagnosis Agent<br/>Technical Root Cause]
-    PLAN[Agent 3: Recovery Planner<br/>Expected Value Proposal]
-
-    POLICY[Deterministic Policy Engine<br/>Ceilings, Retries, Opt-Out]
-    APPROVAL{Human Approval Required?<br/>Amount >= ₹50,000}
-    HUMAN[Human Operator Review<br/>Audit Dashboard]
-
-    GATEWAY[Tool Gateway Boundary<br/>Idempotency & Auth Check]
-    RAZORPAY[Razorpay Test Mode Adapter<br/>PaymentGateway Interface]
-
-    WEBHOOK[Razorpay Webhook<br/>Signature Verification]
-    VERIFY[Verification Engine<br/>Dual-Signal Agreement]
-    AUDIT[Financial Provenance Chain<br/>Immutable AuditLog]
-
-    CASE --> ML
-    ML --> DET
-    DET --> DIAG
-    DIAG --> PLAN
-    PLAN --> POLICY
-
-    POLICY -->|Yes| APPROVAL
-    APPROVAL -->|Authorize| HUMAN
-    HUMAN --> GATEWAY
-    POLICY -->|No: Auto-Allowed| GATEWAY
-
-    GATEWAY --> RAZORPAY
-    RAZORPAY --> WEBHOOK
-    RAZORPAY -->|Signal A: API State| VERIFY
-    WEBHOOK -->|Signal B: Webhook Proof| VERIFY
-
-    VERIFY -->|Dual Signals Agree| AUDIT
-    AUDIT -->|Status: RECOVERED| CASE
+    A[Payment Failure / Event] --> B[Revenue Detective]
+    B --> C[Recoverability ML Model]
+    C --> D[Diagnosis Agent]
+    D --> E[Recovery Planner]
+    E --> F[DETERMINISTIC POLICY ENGINE]
+    
+    F -->|Requires Approval| G[HUMAN APPROVAL GATE]
+    G -->|Approved by Operator| H[Tool Gateway]
+    G -->|Rejected / Pending| I[STOPPED / HUMAN_REVIEW]
+    
+    F -->|Allowed| H[Tool Gateway]
+    F -->|Denied| I
+    
+    H --> J[Razorpay Adapter Protocol]
+    J --> K[Execution via Provider]
+    K --> L[VERIFICATION ENGINE]
+    
+    L --> M[Signal A: Provider API State]
+    L --> N[Signal B: Webhook HMAC Payload]
+    
+    M & N --> O{Signals Agree & Amount Matches?}
+    O -->|YES: Dual Verified| P[RECOVERED State & Verified Revenue > 0]
+    O -->|NO: Conflict| Q[HUMAN_REVIEW State & Verified Revenue = 0]
 ```
 
 ---
 
-## 2. Security Architecture Boundary
+## 3. Subsystem Breakdown
 
-To guarantee that language models and autonomous agents never have unconstrained control over financial operations, RAY routes all external actions through a multi-tier containment boundary:
+### 3.1 Advisory Multi-Agent Layer
+- **Revenue Detective:** Extracts features, queries ML model for $P(\text{recovery})$, computes expected recovery in Python `Decimal`.
+- **Diagnosis Agent:** Identifies failure category (`TRANSIENT`, `TIMEOUT`, `BANK_UNAVAILABLE`, `PERMANENT`, `ABANDONMENT`, etc.) and structured evidence.
+- **Recovery Planner:** Ranks candidate recovery strategies by Expected Value:
+  $$EV = P(\text{success} \mid \text{action}) \times \text{amount} - \text{cost} - \text{penalty}$$
+  Outputs an advisory proposal (does not authorize or execute).
+- **Execution Agent:** Converts approved decisions into strongly-typed `ToolCallRequest` schemas for the Tool Gateway.
 
-```mermaid
-flowchart LR
-    UNTRUSTED[Untrusted Customer Data<br/>notes, description, metadata] -->|PromptInjectionDefense| WRAPPED[Sanitized Data Boundary<br/>&lt;UNTRUSTED_DATA&gt;]
-    
-    WRAPPED --> AGENTS[Advisory LLM Agents<br/>Max 12 Steps Budget]
-    
-    AGENTS -->|Advisory Recommendation Only| POLICY[Deterministic Policy Engine<br/>Code-Level Ceilings & Rules]
-    
-    POLICY -->|Policy Decision ALLOW| GATEWAY[Tool Gateway Security Boundary<br/>Canonical Idempotency ray:case:strat:1]
-    
-    GATEWAY -->|Validated Execution Request| ADAPTER[PaymentGateway Interface<br/>Razorpay Test Mode Adapter]
-    
-    ADAPTER --> RAZORPAY_API[(Razorpay Infrastructure)]
-```
+### 3.2 Deterministic Governance & Policy Engine
+- Absolute authority over all recovery actions.
+- Rules:
+  - `MAX_RETRY_ATTEMPTS = 1`
+  - Auto-retry ceiling: ₹10,000
+  - High-value human gate: $\ge \text{₹}50,000$
+  - Customer opt-outs strictly honored.
+- Rejection or human gating cannot be overridden by any agent or prompt injection.
 
-### Security Guarantees:
-1. **Zero Direct Provider Access**: Neither LLM agents, recovery planners, nor ML predictors have access to the Razorpay SDK or HTTP client. Only `ToolGateway` holds the `PaymentGateway` adapter reference.
-2. **Prompt Injection Containment**: All merchant and customer-controllable inputs are strictly sanitized and enclosed within `<UNTRUSTED_DATA>` tags. Any injected system commands are parsed as passive data fields.
-3. **Execution Guardrails**:
-   - `HIGH_VALUE_THRESHOLD = ₹50,000`: Mandatory human operator authorization.
-   - `AUTO_RETRY_MAX_AMOUNT = ₹25,000`: Hard automated retry ceiling.
-   - `MAX_RETRY_ATTEMPTS = 1`: Prevents cardholder fatigue and payment gateway velocity blocks.
-   - `CUSTOMER_OPT_OUT = DENY`: Respects customer communication preferences.
+### 3.3 Tool Gateway & Idempotency
+- Single entry point for financial execution.
+- Canonical idempotency key: `ray:{case_id}:{strategy}:{attempt_number}`.
+- Replays return cached results with zero duplicate provider calls.
 
----
-
-## 3. Financial Provenance & Dual-Signal Verification
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Merchant as Customer / Checkout
-    participant TG as Tool Gateway
-    participant RZP as Razorpay Test Mode
-    participant VE as Verification Engine
-    participant DB as Audit & Provenance DB
-
-    Merchant->>TG: Dispatches Authorized Recovery Action
-    TG->>RZP: Dispatches retry / payment_link with Idempotency Key
-    RZP-->>TG: Returns Provider Reference (e.g. pay_retry_abc123)
-    TG->>DB: Stores ExecutionRecord (SHA-256 Response Hash)
-    
-    Note over VE: Dual-Signal Independent Verification
-    VE->>RZP: Signal A: Polls GET /v1/payments/{id} -> status == 'captured'
-    RZP-->>VE: Signal B: Webhook 'payment.captured' with HMAC-SHA256 signature
-    
-    rect rgb(20, 40, 20)
-    Note over VE,DB: Signal Agreement Check
-    VE->>VE: Evaluates: Signal A (captured) + Signal B (captured) == VERIFIED
-    VE->>VE: Computes Canonical Evidence Hash = SHA256(payload)
-    VE->>DB: Persists VerificationRecord & Updates Case -> RECOVERED
-    end
-```
+### 3.4 Verification Engine & Cryptographic Evidence
+- Requires two independent signals:
+  1. API Polling: `status == 'captured'`
+  2. Webhook: HMAC-SHA256 signature verification + event payload match
+- Generates SHA-256 evidence hash from canonical JSON payload.
+- In case of disagreement, case escalates to `HUMAN_REVIEW` with `verified_amount = 0.00`.

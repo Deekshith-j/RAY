@@ -240,6 +240,12 @@ Evaluated on **1,896 identical held-out test events** (zero customer leakage):
 - SQLite (local development default) or PostgreSQL in Docker
 
 ### One-Command Demonstration Launch
+**Quick Demo Runner (3 Canonical Scenarios):**
+```bash
+python scripts/demo.py
+```
+
+**Full Environment Launch:**
 **Windows PowerShell:**
 ```powershell
 .\run_demo.ps1
