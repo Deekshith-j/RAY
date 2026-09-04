@@ -96,12 +96,22 @@ class VerificationEngine:
                     break
 
         webhook_explicit_failure = False
+        amount_mismatch = False
         if webhook_payload:
             event_type = webhook_payload.get("event", "")
             wh_status = webhook_payload.get("status", "")
             if event_type in ("payment.captured", "order.paid") or wh_status == "captured":
                 webhook_confirmed = True
                 webhook_event_id = webhook_payload.get("id", f"evt_{uuid.uuid4().hex[:8]}")
+
+                # Verify amount matches case amount at risk
+                wh_payment_entity = webhook_payload.get("payment", {}).get("entity", {})
+                wh_raw_amount = wh_payment_entity.get("amount") or webhook_payload.get("amount")
+                if wh_raw_amount is not None:
+                    wh_inr = float(wh_raw_amount) / 100.0 if float(wh_raw_amount) >= 1000 else float(wh_raw_amount)
+                    if abs(wh_inr - float(case.amount_at_risk)) > 0.05:
+                        amount_mismatch = True
+
             elif event_type in ("payment.failed", "refund.created", "dispute.created") or wh_status in ("failed", "refunded"):
                 webhook_explicit_failure = True
                 webhook_event_id = webhook_payload.get("id", f"evt_{uuid.uuid4().hex[:8]}")
@@ -112,11 +122,11 @@ class VerificationEngine:
         verif_id = f"verif_{uuid.uuid4().hex[:16]}"
         now = datetime.utcnow()
 
-        if api_confirmed and webhook_confirmed:
+        if api_confirmed and webhook_confirmed and not amount_mismatch:
             status = VerificationStatus.VERIFIED
             verified_amount = float(case.amount_at_risk)
-        elif (api_confirmed and webhook_explicit_failure) or (not api_confirmed and webhook_confirmed):
-            status = VerificationStatus.CONFLICT  # Discrepancy between API and webhook
+        elif amount_mismatch or (api_confirmed and webhook_explicit_failure) or (not api_confirmed and webhook_confirmed):
+            status = VerificationStatus.CONFLICT  # Discrepancy between API and webhook or amount mismatch
             verified_amount = 0.0
         elif api_confirmed and not webhook_confirmed:
             status = VerificationStatus.PENDING
@@ -135,6 +145,7 @@ class VerificationEngine:
             "webhook_confirmed": webhook_confirmed,
             "webhook_event_id": webhook_event_id,
             "verified_amount": verified_amount,
+            "amount_mismatch": amount_mismatch,
             "correlation_id": execution.correlation_id,
             "timestamp": now.isoformat(),
         }
@@ -145,6 +156,9 @@ class VerificationEngine:
             id=verif_id,
             case_id=case_id,
             execution_id=execution_id,
+            api_verified=api_confirmed,
+            webhook_verified=webhook_confirmed,
+            signals_agree=(status == VerificationStatus.VERIFIED),
             webhook_confirmed=webhook_confirmed,
             api_state_confirmed=api_confirmed,
             provider_status=api_status,
@@ -152,6 +166,8 @@ class VerificationEngine:
             verification_status=status.value,
             verification_method="dual_signal_api_webhook",
             evidence_hash=evidence_hash,
+            api_evidence_hash=evidence_hash if api_confirmed else None,
+            webhook_evidence_hash=evidence_hash if webhook_confirmed else None,
             evidence_json=evidence,
             verification_timestamp=now,
             correlation_id=execution.correlation_id,

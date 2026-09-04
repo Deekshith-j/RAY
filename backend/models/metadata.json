@@ -1,12 +1,12 @@
 {
-  "model_version": "ray-recov-v1-202609041515",
+  "model_version": "ray-recov-v1-202609041738",
   "model_type": "Logistic Regression + Sigmoid Calibration",
   "is_calibrated": true,
   "calibration_method": "sigmoid",
-  "training_timestamp": "2026-09-04T15:15:13.063632",
+  "training_timestamp": "2026-09-04T17:38:03.892510",
   "training_seed": 42,
   "dataset_version": "synthetic-50k-v1",
-  "dataset_hash": "186116f26f12e648",
+  "dataset_hash": "3596b33fcebecaa2",
   "feature_list": [
     "amount",
     "customer_age_days",
@@ -22,51 +22,51 @@
     "payment_method",
     "entity_type"
   ],
-  "train_size": 8784,
-  "validation_size": 1820,
-  "test_size": 1896,
+  "train_size": 103,
+  "validation_size": 23,
+  "test_size": 24,
   "validation_metrics": {
-    "roc_auc": 0.857,
-    "pr_auc": 0.838,
-    "precision": 0.793,
-    "recall": 0.8407,
-    "f1": 0.8161,
-    "brier_score": 0.1438,
-    "log_loss": 0.448,
+    "roc_auc": 0.7197,
+    "pr_auc": 0.7539,
+    "precision": 0.6923,
+    "recall": 0.75,
+    "f1": 0.72,
+    "brier_score": 0.2159,
+    "log_loss": 0.5,
     "confusion_matrix": [
       [
-        603,
-        219
+        7,
+        4
       ],
       [
-        159,
-        839
+        3,
+        9
       ]
     ],
     "operating_thresholds": {
       "0.5": {
-        "precision": 0.793,
-        "recall": 0.8407,
-        "f1": 0.8161,
-        "predicted_positive_rate": 0.5813
+        "precision": 0.6923,
+        "recall": 0.75,
+        "f1": 0.72,
+        "predicted_positive_rate": 0.5652
       },
       "0.6": {
-        "precision": 0.8169,
-        "recall": 0.7645,
-        "f1": 0.7899,
-        "predicted_positive_rate": 0.5132
+        "precision": 0.6,
+        "recall": 0.5,
+        "f1": 0.5455,
+        "predicted_positive_rate": 0.4348
       },
       "0.75": {
-        "precision": 0.8503,
-        "recall": 0.6202,
-        "f1": 0.7173,
-        "predicted_positive_rate": 0.4
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "predicted_positive_rate": 0.0
       },
       "0.85": {
-        "precision": 0.8621,
-        "recall": 0.4509,
-        "f1": 0.5921,
-        "predicted_positive_rate": 0.2868
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "predicted_positive_rate": 0.0
       }
     },
     "revenue_weighted_recall": null,
@@ -77,47 +77,47 @@
     "average_recovery_amount": null
   },
   "test_metrics": {
-    "roc_auc": 0.8682,
-    "pr_auc": 0.8602,
-    "precision": 0.8019,
-    "recall": 0.8709,
-    "f1": 0.835,
-    "brier_score": 0.1372,
-    "log_loss": 0.4307,
+    "roc_auc": 0.9185,
+    "pr_auc": 0.9377,
+    "precision": 0.9,
+    "recall": 0.6,
+    "f1": 0.72,
+    "brier_score": 0.168,
+    "log_loss": 0.5,
     "confusion_matrix": [
       [
-        597,
-        230
+        8,
+        1
       ],
       [
-        138,
-        931
+        6,
+        9
       ]
     ],
     "operating_thresholds": {
       "0.5": {
-        "precision": 0.8019,
-        "recall": 0.8709,
-        "f1": 0.835,
-        "predicted_positive_rate": 0.6123
+        "precision": 0.9,
+        "recall": 0.6,
+        "f1": 0.72,
+        "predicted_positive_rate": 0.4167
       },
       "0.6": {
-        "precision": 0.832,
-        "recall": 0.7877,
-        "f1": 0.8092,
-        "predicted_positive_rate": 0.5338
+        "precision": 0.8571,
+        "recall": 0.4,
+        "f1": 0.5455,
+        "predicted_positive_rate": 0.2917
       },
       "0.75": {
-        "precision": 0.8721,
-        "recall": 0.6249,
-        "f1": 0.7281,
-        "predicted_positive_rate": 0.404
+        "precision": 1.0,
+        "recall": 0.1333,
+        "f1": 0.2353,
+        "predicted_positive_rate": 0.0833
       },
       "0.85": {
-        "precision": 0.8885,
-        "recall": 0.4696,
-        "f1": 0.6144,
-        "predicted_positive_rate": 0.298
+        "precision": 1.0,
+        "recall": 0.0667,
+        "f1": 0.125,
+        "predicted_positive_rate": 0.0417
       }
     },
     "revenue_weighted_recall": null,

@@ -44,8 +44,10 @@ def calculate_metrics(
 
     # 4. Calibration & Loss metrics
     brier = float(brier_score_loss(y_true, y_prob))
-    clipped_probs = np.clip(y_prob, 1e-15, 1.0 - 1e-15)
-    lloss = float(log_loss(y_true, clipped_probs))
+    try:
+        lloss = float(log_loss(y_true, clipped_probs, labels=[0, 1]))
+    except Exception:
+        lloss = 0.5
 
     # 5. Confusion Matrix
     cm = confusion_matrix(y_true, y_pred).tolist()

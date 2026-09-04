@@ -55,4 +55,14 @@ async def authorize_tool_call(
     if ("subscription" in op_lower or "charge" in op_lower) and strat_upper != "SUBSCRIPTION_RECOVERY":
         return False, f"Operation '{request.operation}' does not match authorized strategy '{strat_upper}'", case, decision
 
+    # 7. Amount validation
+    req_amount = request.parameters.get("amount", case.amount_at_risk)
+    try:
+        req_amt_float = float(req_amount)
+    except (ValueError, TypeError):
+        return False, f"Invalid payment amount '{req_amount}'", case, decision
+
+    if req_amt_float <= 0 or float(case.amount_at_risk) <= 0:
+        return False, f"Payment amount must be strictly positive, got ₹{req_amt_float}", case, decision
+
     return True, None, case, decision

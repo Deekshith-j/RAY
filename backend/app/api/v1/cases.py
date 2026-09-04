@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload
@@ -151,3 +151,32 @@ async def approve_or_reject_case(
         resp.customer_name = case.customer.name
         resp.customer_email = case.customer.email
     return resp
+
+
+@router.get("/{case_id}/events", summary="SSE stream of recovery lifecycle events (alias)")
+async def stream_case_events_alias(case_id: str, request: Request):
+    """Server-Sent Events stream for real-time frontend timeline updates."""
+    import asyncio
+    import json
+    from fastapi.responses import StreamingResponse
+    from app.agents.orchestrator import orchestrator
+
+    async def event_generator():
+        last_count = 0
+        while True:
+            if await request.is_disconnected():
+                break
+
+            events = orchestrator.get_timeline(case_id)
+            if len(events) > last_count:
+                for new_event in events[last_count:]:
+                    yield f"data: {json.dumps(new_event)}\n\n"
+                last_count = len(events)
+
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
