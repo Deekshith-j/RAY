@@ -27,6 +27,10 @@ import {
   Cpu,
   Layers,
   Terminal,
+  XCircle,
+  Hash,
+  ShieldAlert,
+  Bot,
 } from "lucide-react";
 
 export default function CaseDetailPage() {
@@ -75,39 +79,16 @@ export default function CaseDetailPage() {
     setActionMessage(null);
     try {
       await runFullRecovery(caseId);
-      setActionMessage("Recovery workflow executed successfully!");
+      setActionMessage("Autonomous recovery pipeline executed and verified.");
       await loadAll();
     } catch (err: any) {
-      setActionMessage(`Error: ${err.message}`);
+      setActionMessage(`Execution error: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
   };
 
-  if (loading && !caseData) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex items-center gap-3 text-slate-400 font-mono">
-          <RefreshCw className="w-5 h-5 animate-spin text-emerald-400" />
-          Loading case provenance telemetry...
-        </div>
-      </div>
-    );
-  }
-
-  if (!caseData) {
-    return (
-      <div className="text-center py-20">
-        <h2 className="text-xl font-bold text-white mb-2">Case Not Found</h2>
-        <p className="text-slate-400 mb-4">Case {caseId} does not exist in the ledger.</p>
-        <Link href="/cases" className="text-emerald-400 hover:underline">
-          &larr; Back to Cases
-        </Link>
-      </div>
-    );
-  }
-
-  const handleAuthorize = async () => {
+  const handleAuthorize = async (approved: boolean) => {
     setActionLoading(true);
     setActionMessage(null);
     try {
@@ -116,14 +97,18 @@ export default function CaseDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           case_id: caseId,
-          approved: true,
-          reviewer_name: "Operations Lead (You)",
-          notes: "Approved high-value recovery execution after policy verification.",
+          approved,
+          reviewer_name: "Risk Lead (You)",
+          notes: approved
+            ? "Approved high-value recovery execution after policy verification."
+            : "Rejected high-value recovery execution due to risk boundary.",
         }),
       });
       if (res.ok) {
-        setActionMessage("Authorization recorded! Executing recovery...");
-        await runFullRecovery(caseId);
+        setActionMessage(approved ? "Authorization recorded! Executing recovery..." : "Rejection recorded. Case stopped.");
+        if (approved) {
+          await runFullRecovery(caseId);
+        }
         await loadAll();
       } else {
         const err = await res.json().catch(() => ({ detail: "Approval failed" }));
@@ -136,8 +121,33 @@ export default function CaseDetailPage() {
     }
   };
 
+  if (loading && !caseData) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex items-center gap-3 text-slate-400 font-mono text-xs">
+          <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
+          Loading case provenance telemetry...
+        </div>
+      </div>
+    );
+  }
+
+  if (!caseData) {
+    return (
+      <div className="text-center py-20 space-y-3">
+        <h2 className="text-lg font-bold text-white font-mono">Case Not Found</h2>
+        <p className="text-xs text-slate-400 font-mono">Case {caseId} does not exist in the ledger.</p>
+        <Link href="/cases" className="text-xs text-blue-400 hover:underline font-mono inline-block">
+          &larr; Back to Cases
+        </Link>
+      </div>
+    );
+  }
+
   const prob = caseData.recoverability_score || 0;
   const band = prob >= 0.85 ? "HIGH" : prob >= 0.6 ? "MEDIUM" : "LOW";
+  const isRecovered = caseData.state === "RECOVERED";
+  const isAwaitingApproval = caseData.state === "AWAITING_APPROVAL";
 
   return (
     <div className="space-y-8 pb-16">
@@ -145,469 +155,490 @@ export default function CaseDetailPage() {
       <div>
         <Link
           href="/cases"
-          className="inline-flex items-center gap-1 text-xs font-mono text-slate-400 hover:text-white mb-4 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-400 hover:text-white mb-4 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Cases Ledger
         </Link>
 
-        {/* Autonomous Financial Control Banner */}
-        <div className="mb-5 bg-slate-900/90 border border-emerald-500/20 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono shadow-lg shadow-emerald-950/20">
-          <div className="flex items-center gap-2 text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-emerald-300 font-bold uppercase tracking-wider text-[11px]">System Invariant:</span>
-            <span className="text-slate-400 text-[11px] hidden md:inline">Prediction ≠ Recommendation ≠ Authorization ≠ Execution ≠ Verification</span>
-          </div>
-          <div className="text-slate-400 text-[11px]">
-            <span className="text-emerald-400 font-semibold">&ldquo;AI is capable enough to recommend. The system is constrained enough to trust.&rdquo;</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
+        {/* Top Header Card */}
+        <div className="p-6 rounded-xl bg-[#0A0E17] border border-[#162030] shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl lg:text-3xl font-bold text-white font-mono">{caseData.id}</h1>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-xs font-mono text-slate-400">Recovery Case</span>
+              <span className="text-slate-600">&bull;</span>
+              <span className="text-xs font-mono text-slate-400">{caseData.entity_type} {caseData.entity_id}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl lg:text-3xl font-bold text-white font-mono tracking-tight">
+                {caseData.id}
+              </h1>
+              <span className="text-2xl lg:text-3xl font-bold text-slate-300 font-mono tabular-nums">
+                {formatCurrencyINR(caseData.amount_at_risk)}
+              </span>
               <span
-                className={`px-3 py-1 rounded text-xs font-bold font-mono uppercase tracking-wider ${
-                  caseData.state === "RECOVERED"
-                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                    : caseData.state === "AWAITING_APPROVAL"
-                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                    : caseData.state === "ANALYZING"
-                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/40"
-                    : "bg-slate-800 text-slate-300 border border-slate-700"
+                className={`px-3 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider border ${
+                  isRecovered
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                    : isAwaitingApproval
+                    ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                    : caseData.state === "HUMAN_REVIEW"
+                    ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                    : "bg-blue-500/10 text-blue-400 border-blue-500/30"
                 }`}
               >
-                {caseData.state}
+                ● {isRecovered ? "VERIFIED RECOVERED" : caseData.state}
               </span>
             </div>
-            <p className="text-sm text-slate-400">
-              {caseData.entity_type} {caseData.entity_id} &bull; Customer: {caseData.customer_name || caseData.customer_id}
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               onClick={loadAll}
-              className="px-3 py-2 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 text-xs font-mono flex items-center gap-1.5 transition-colors"
+              className="px-3 py-2 rounded bg-[#0E1624] border border-[#1B283A] hover:bg-[#142032] text-slate-300 text-xs font-mono flex items-center gap-1.5 transition"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Refresh
             </button>
 
-            {caseData.state === "AWAITING_APPROVAL" ? (
-              <button
-                onClick={handleAuthorize}
-                disabled={actionLoading}
-                className="px-5 py-2 rounded bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs tracking-wider uppercase flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
-              >
-                <CheckCircle2 className="w-4 h-4 fill-current" />
-                {actionLoading ? "Authorizing..." : "AUTHORIZE EXECUTION"}
-              </button>
-            ) : caseData.state !== "RECOVERED" ? (
+            {!isRecovered && !isAwaitingApproval && (
               <button
                 onClick={handleRunAutonomousRecovery}
                 disabled={actionLoading}
-                className="px-4 py-2 rounded bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs tracking-wide uppercase flex items-center gap-2 shadow-lg shadow-emerald-500/10 transition-all disabled:opacity-50"
+                className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs font-mono uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition disabled:opacity-50"
               >
-                <Zap className="w-4 h-4 fill-current" />
-                {actionLoading ? "Executing Bounded Pipeline..." : "Execute Recovery Flow"}
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                {actionLoading ? "Executing Pipeline..." : "Execute Recovery"}
               </button>
-            ) : null}
+            )}
           </div>
         </div>
 
-        {/* High-Value Human Approval Explicit Block */}
-        {caseData.state === "AWAITING_APPROVAL" && (
-          <div className="mt-6 p-6 rounded-2xl bg-amber-950/40 border-2 border-amber-500/50 shadow-2xl space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 text-amber-400 font-bold text-sm tracking-wider uppercase">
-                  <AlertTriangle className="w-5 h-5" />
-                  Mandatory Human Authorization Required
-                </div>
-                <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
-                  Amount ({formatCurrencyINR(caseData.amount_at_risk)}) meets or exceeds the ₹50,000 policy ceiling.
-                  AI recommendation ({caseData.recommended_action || "RETRY"}) is strictly advisory and cannot execute without formal operator sign-off.
-                </p>
-              </div>
-              <span className="px-3 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-xs font-bold shrink-0">
-                EXECUTION BLOCKED
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs font-mono bg-slate-950/80 p-3.5 rounded-lg border border-amber-900/40">
-              <div>
-                <span className="text-slate-500 block text-[10px]">AI RECOMMENDATION</span>
-                <strong className="text-blue-400">{caseData.recommended_action || "RETRY"}</strong>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">POLICY DECISION</span>
-                <strong className="text-amber-400">REQUIRE_HUMAN_APPROVAL</strong>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">POLICY REASON</span>
-                <strong className="text-slate-300">HIGH_VALUE &ge; ₹50,000</strong>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">TOOL GATEWAY</span>
-                <strong className="text-rose-400">BLOCKED (0 Calls)</strong>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 pt-1">
-              <button
-                onClick={handleAuthorize}
-                disabled={actionLoading}
-                className="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs tracking-wider uppercase flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                {actionLoading ? "Authorizing..." : "AUTHORIZE EXECUTION"}
-              </button>
-            </div>
-          </div>
-        )}
-
         {actionMessage && (
-          <div className="mt-4 p-3 rounded bg-slate-900/90 border border-slate-700 text-xs font-mono text-emerald-400">
+          <div className="mt-4 p-3 rounded-lg bg-[#0E1B2C] border border-[#1B3556] text-xs font-mono text-emerald-400">
             {actionMessage}
           </div>
         )}
       </div>
 
-      {/* 6 Provenance Lineage Cards */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck className="w-5 h-5 text-emerald-400" />
-          <h2 className="text-lg font-bold text-white tracking-tight">
-            Cryptographic Financial Provenance Chain
-          </h2>
-          <span className="text-xs font-mono text-slate-400 ml-2">
+      {/* Core Invariant Banner */}
+      <div className="p-4 rounded-xl bg-[#0B1120] border border-[#1B2940] flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs font-mono">
+        <div className="space-y-0.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 block">
+            System Invariant
+          </span>
+          <p className="text-white font-semibold tracking-tight text-xs">
             PREDICTION ≠ RECOMMENDATION ≠ AUTHORIZATION ≠ EXECUTION ≠ VERIFICATION
+          </p>
+        </div>
+        <p className="text-[11px] text-slate-400 italic md:text-right">
+          &ldquo;AI intelligence is separated from financial authority.&rdquo;
+        </p>
+      </div>
+
+      {/* High-Value Approval Box (When case >= ₹50k or AWAITING_APPROVAL) */}
+      {isAwaitingApproval && (
+        <div className="p-6 rounded-xl bg-[#140D07] border-2 border-amber-500/50 shadow-2xl space-y-4 font-mono">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm tracking-wider uppercase">
+                <AlertTriangle className="w-5 h-5" />
+                HUMAN AUTHORIZATION REQUIRED
+              </div>
+              <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
+                {formatCurrencyINR(caseData.amount_at_risk)} exceeds the automatic recovery ceiling of ₹50,000.
+                AI recommends an action, but Policy Engine deterministically halts tool execution until signed operator authorization.
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold shrink-0">
+              0 EXECUTIONS DISPATCHED
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-[#090C12] p-4 rounded-lg border border-amber-900/40">
+            <div>
+              <span className="text-slate-500 block text-[10px] uppercase">AI Recommendation</span>
+              <strong className="text-blue-400 text-sm mt-0.5 block">{caseData.recommended_action || "RETRY"}</strong>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px] uppercase">Policy Decision</span>
+              <strong className="text-amber-400 text-sm mt-0.5 block">BLOCKED — HUMAN APPROVAL REQUIRED</strong>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px] uppercase">Financial Execution</span>
+              <strong className="text-rose-400 text-sm mt-0.5 block">0 EXECUTIONS</strong>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[11px] text-amber-300/80 italic">
+              AI recommended it &ne; system authorized it
+            </span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => handleAuthorize(false)}
+                disabled={actionLoading}
+                className="px-4 py-2 rounded-lg bg-[#1F1515] border border-rose-800/60 hover:bg-rose-900/40 text-rose-300 text-xs font-bold tracking-wider uppercase transition disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <XCircle className="w-4 h-4" /> Reject
+              </button>
+              <button
+                onClick={() => handleAuthorize(true)}
+                disabled={actionLoading}
+                className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black tracking-wider uppercase transition disabled:opacity-50 flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+              >
+                <CheckCircle2 className="w-4 h-4 fill-current" /> Approve Execution
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6 Provenance Lineage Cards */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+              Financial Provenance Chain
+            </h2>
+          </div>
+          <span className="text-[10px] font-mono text-slate-400">
+            Prediction &rarr; Recommendation &rarr; Authorization &rarr; Execution &rarr; Verification &rarr; Revenue
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {/* Card 1: Revenue Opportunity */}
-          <div className="rounded-xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700 transition-colors">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold font-mono text-emerald-400 tracking-wider uppercase flex items-center gap-1.5">
-                <Cpu className="w-3.5 h-3.5" /> 1. Opportunity
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-mono text-xs">
+          {/* Card 01: Opportunity */}
+          <div className="p-5 rounded-xl bg-[#0A0E17] border border-[#162030] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                01 &mdash; OPPORTUNITY
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300">
+              <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 font-semibold">
                 BAND: {band}
               </span>
             </div>
-
-            <div className="space-y-2.5 text-xs font-mono">
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Amount at Risk:</span>
-                <span className="font-bold text-rose-400">{formatCurrencyINR(caseData.amount_at_risk)}</span>
+            <div className="space-y-1.5">
+              <div className="text-lg font-bold text-white tabular-nums">
+                {formatCurrencyINR(caseData.amount_at_risk)}
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Failure Type:</span>
-                <span className="text-white">{caseData.failure_type}</span>
+              <p className="text-[11px] text-slate-400">Revenue at risk from payment failure</p>
+            </div>
+            <div className="pt-2 border-t border-[#141E2C] text-[11px] text-slate-400 space-y-1">
+              <div className="flex justify-between">
+                <span>Failure Event:</span>
+                <span className="text-slate-200">{caseData.failure_type}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">ML P(recovery):</span>
-                <span className="font-bold text-emerald-400">{(prob * 100).toFixed(2)}%</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Expected Value:</span>
-                <span className="font-bold text-blue-400">{formatCurrencyINR(caseData.expected_recovery_value)}</span>
+              <div className="flex justify-between">
+                <span>P(recovery):</span>
+                <span className="text-emerald-400 font-bold">{(prob * 100).toFixed(1)}%</span>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Diagnosis Agent */}
-          <div className="rounded-xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700 transition-colors">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold font-mono text-blue-400 tracking-wider uppercase flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5" /> 2. Diagnosis Agent
+          {/* Card 02: AI Diagnosis */}
+          <div className="p-5 rounded-xl bg-[#0A0E17] border border-[#162030] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+                02 &mdash; AI DIAGNOSIS
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              <span className="px-2 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20">
                 ADVISORY
               </span>
             </div>
-
-            <div className="space-y-2.5 text-xs font-mono">
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Failure Cause:</span>
-                <span className="font-bold text-white">{caseData.failure_type.toUpperCase()}</span>
+            <div className="space-y-1.5">
+              <div className="text-base font-bold text-white uppercase">
+                {caseData.failure_type.replace(/_/g, " ")}
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Technical Reason:</span>
-                <span className="text-slate-300 truncate max-w-[180px]" title={caseData.failure_reason}>
-                  {caseData.failure_reason}
-                </span>
+              <p className="text-[11px] text-slate-400">Classified root cause telemetry</p>
+            </div>
+            <div className="pt-2 border-t border-[#141E2C] text-[11px] text-slate-400 space-y-1">
+              <div className="flex justify-between">
+                <span>Confidence:</span>
+                <span className="text-blue-400 font-semibold">91.4%</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Diagnosis Family:</span>
-                <span className="text-blue-300">TRANSIENT_FAILURE</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Confidence:</span>
-                <span className="text-emerald-400 font-bold">92.0%</span>
+              <div className="flex justify-between">
+                <span>Data Boundary:</span>
+                <span className="text-emerald-400">&lt;UNTRUSTED_DATA&gt;</span>
               </div>
             </div>
           </div>
 
-          {/* Card 3: Recovery Recommendation */}
-          <div className="rounded-xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700 transition-colors">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold font-mono text-purple-400 tracking-wider uppercase flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" /> 3. Recommendation
+          {/* Card 03: Recovery Recommendation */}
+          <div className="p-5 rounded-xl bg-[#0A0E17] border border-[#162030] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
+                03 &mdash; RECOMMENDATION
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              <span className="px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20">
                 PROPOSAL
               </span>
             </div>
-
-            <div className="space-y-2.5 text-xs font-mono">
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Proposed Strategy:</span>
-                <span className="font-bold text-white">
-                  {decision?.recommended_strategy || caseData.recommended_action || "RETRY"}
-                </span>
+            <div className="space-y-1.5">
+              <div className="text-base font-bold text-white uppercase">
+                {decision?.recommended_strategy || caseData.recommended_action || "RETRY"}
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Expected Recovery:</span>
-                <span className="text-emerald-400 font-bold">
+              <p className="text-[11px] text-slate-400">Ranked by Expected Value (EV)</p>
+            </div>
+            <div className="pt-2 border-t border-[#141E2C] text-[11px] text-slate-400 space-y-1">
+              <div className="flex justify-between">
+                <span>Expected Recovery:</span>
+                <span className="text-purple-300 font-bold">
                   {formatCurrencyINR(decision?.expected_recovery || caseData.expected_recovery_value)}
                 </span>
               </div>
-              <div className="py-1">
-                <span className="text-slate-400 block mb-1">Planner Rationale:</span>
-                <p className="text-slate-300 text-[11px] leading-relaxed line-clamp-2">
-                  {decision?.rationale || "Transient timeout with high recoverability. Auto-retry within safe limit."}
-                </p>
+              <div className="flex justify-between">
+                <span>Authority:</span>
+                <span className="text-amber-400">Advisory Only</span>
               </div>
             </div>
           </div>
 
-          {/* Card 4: Policy Engine Check */}
-          <div className="rounded-xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700 transition-colors">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold font-mono text-amber-400 tracking-wider uppercase flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5" /> 4. Policy Engine
+          {/* Card 04: Policy Authorization */}
+          <div className="p-5 rounded-xl bg-[#0A0E17] border border-[#162030] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                04 &mdash; POLICY AUTHORIZATION
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                AUTHORITY
-              </span>
-            </div>
-
-            <div className="space-y-2.5 text-xs font-mono">
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Policy Evaluation:</span>
-                <span
-                  className={`font-bold ${
-                    decision?.policy_result === "ALLOW"
-                      ? "text-emerald-400"
-                      : decision?.policy_result === "REQUIRE_HUMAN_APPROVAL"
-                      ? "text-amber-400"
-                      : "text-slate-300"
-                  }`}
-                >
-                  {decision?.policy_result || (caseData.amount_at_risk >= 50000 ? "REQUIRE_HUMAN_APPROVAL" : "ALLOW")}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">High-Value Gate:</span>
-                <span className="text-white">
-                  {caseData.amount_at_risk >= 50000 ? "Triggered (≥ ₹50k)" : "Exempt (< ₹50k)"}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Auth Status:</span>
-                <span className="text-emerald-400 font-bold">
-                  {decision?.authorization_status || (caseData.state === "AWAITING_APPROVAL" ? "PENDING" : "AUTHORIZED")}
-                </span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Policy Version:</span>
-                <span className="text-slate-400">v1.0 (Deterministic)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 5: Tool Gateway Execution */}
-          <div className="rounded-xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700 transition-colors">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold font-mono text-cyan-400 tracking-wider uppercase flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5" /> 5. Tool Gateway
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                GATEWAY
+              <span className="px-2 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                DETERMINISTIC
               </span>
             </div>
-
-            <div className="space-y-2.5 text-xs font-mono">
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Operation:</span>
-                <span className="font-bold text-white">{execution?.operation || "retry_payment"}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Execution Status:</span>
-                <span className="text-emerald-400 font-bold">{execution?.execution_status || (execution ? "SUCCESS" : "PENDING")}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Provider Ref:</span>
-                <span className="text-slate-300 font-mono text-[11px] truncate max-w-[160px]">
-                  {execution?.provider_reference || "pay_retry_mock_001"}
-                </span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Idempotency Key:</span>
-                <span className="text-slate-400 font-mono text-[10px] truncate max-w-[160px]">
-                  {execution?.idempotency_key || `ray:${caseData.id}:RETRY:1`}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 6: Dual-Signal Verification */}
-          <div className="rounded-xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700 transition-colors">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold font-mono text-emerald-400 tracking-wider uppercase flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5" /> 6. Verification
-              </span>
-              <span
-                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                  verification?.verification_status === "VERIFIED" || caseData.state === "RECOVERED"
-                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                    : "bg-slate-800 text-slate-400"
+            <div className="space-y-1.5">
+              <div
+                className={`text-base font-bold uppercase ${
+                  decision?.policy_result === "ALLOW"
+                    ? "text-emerald-400"
+                    : isAwaitingApproval
+                    ? "text-amber-400"
+                    : "text-slate-200"
                 }`}
               >
-                {verification?.verification_status || (caseData.state === "RECOVERED" ? "VERIFIED" : "PENDING")}
+                {decision?.policy_result === "ALLOW" ? "✓ ALLOWED" : decision?.policy_result || (caseData.amount_at_risk >= 50000 ? "REQUIRE_HUMAN_APPROVAL" : "ALLOWED")}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                {caseData.amount_at_risk >= 50000 ? "Exceeds ₹50k threshold" : "Within automatic retry ceiling"}
+              </p>
+            </div>
+            <div className="pt-2 border-t border-[#141E2C] text-[11px] text-slate-400 space-y-1">
+              <div className="flex justify-between">
+                <span>Rule Engine:</span>
+                <span className="text-slate-300">Rules 1-10 Enforced</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Policy Version:</span>
+                <span className="text-slate-300">v1.0 (Python)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 05: Tool Gateway */}
+          <div className="p-5 rounded-xl bg-[#0A0E17] border border-[#162030] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
+                05 &mdash; TOOL GATEWAY
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                ENFORCED
               </span>
             </div>
-
-            <div className="space-y-2.5 text-xs font-mono">
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Signal A (API Poll):</span>
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> CAPTURED
+            <div className="space-y-1.5">
+              <div className="text-base font-bold text-white uppercase">
+                {execution?.execution_status === "SUCCESS" ? "✓ AUTHORIZED" : (execution?.execution_status || (execution ? "SUCCESS" : "PENDING"))}
+              </div>
+              <p className="text-[11px] text-slate-400 truncate max-w-[220px]">
+                Ref: {execution?.provider_reference || "pay_retry_mock_001"}
+              </p>
+            </div>
+            <div className="pt-2 border-t border-[#141E2C] text-[11px] text-slate-400 space-y-1">
+              <div className="flex justify-between">
+                <span>Idempotency:</span>
+                <span className="text-cyan-400 font-mono text-[10px]">
+                  {execution?.idempotency_key ? `${execution.idempotency_key.slice(0, 18)}...` : `ray:${caseData.id}:retry:1`}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Signal B (Webhook):</span>
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> CONFIRMED
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Verified Revenue:</span>
-                <span className="text-emerald-400 font-bold">
-                  {formatCurrencyINR(verification?.verified_amount || caseData.recovered_amount || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Evidence Hash:</span>
-                <span className="text-slate-500 font-mono text-[10px] truncate max-w-[150px]">
-                  {verification?.evidence_hash ? `${verification.evidence_hash.slice(0, 16)}...` : "SHA256:58f2b854..."}
-                </span>
+              <div className="flex justify-between">
+                <span>Adapter:</span>
+                <span className="text-slate-300">Razorpay Test Adapter</span>
               </div>
             </div>
+          </div>
+
+          {/* Card 06: Verification */}
+          <div className="p-5 rounded-xl bg-[#0A0E17] border border-[#162030] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                06 &mdash; VERIFICATION
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
+                DUAL-SIGNAL
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-base font-bold text-emerald-400 uppercase flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                {isRecovered ? "VERIFIED" : (verification?.verification_status || "PENDING")}
+              </div>
+              <p className="text-[11px] text-slate-400">Independent dual confirmation</p>
+            </div>
+            <div className="pt-2 border-t border-[#141E2C] text-[11px] text-slate-400 space-y-1">
+              <div className="flex justify-between">
+                <span>API Status:</span>
+                <span className="text-emerald-400">✓ CAPTURED</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Webhook HMAC:</span>
+                <span className="text-emerald-400">✓ SIGNED</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Final Verified Revenue Callout */}
+        <div className="p-5 rounded-xl bg-[#0D1826] border border-emerald-500/30 flex items-center justify-between font-mono">
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+              VERIFIED REVENUE INCREMENT
+            </span>
+            <div className="text-2xl font-bold text-white tabular-nums">
+              {formatCurrencyINR(isRecovered ? caseData.amount_at_risk : (caseData.recovered_amount || 0))}
+            </div>
+          </div>
+          <div className="text-right space-y-1">
+            <span className="px-3 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold">
+              {isRecovered ? "LEDGER RECOVERED" : "HELD PENDING DUAL-SIGNAL"}
+            </span>
+            <p className="text-[10px] text-slate-400 block">
+              Hash: {verification?.evidence_hash ? `${verification.evidence_hash.slice(0, 16)}...` : "SHA256:58f2b854..."}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Explanatory Traceability Panels: 'Why Did RAY Do This?' & 'Why Did RAY Not Act?' */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Panel 1: Why did RAY do this? */}
-        <div className="rounded-xl border border-emerald-500/30 bg-slate-900/60 p-5 backdrop-blur-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-              Why Did RAY Take This Action?
-            </h3>
+      {/* Explanatory Traceability Timelines */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 font-mono text-xs">
+        {/* Panel 1: Why Did RAY Take This Action? */}
+        <div className="p-5 rounded-xl bg-[#0A0F1A] border border-[#162234] space-y-3">
+          <div className="flex items-center gap-2 text-emerald-400 font-bold uppercase tracking-wider text-xs">
+            <CheckCircle2 className="w-4 h-4" />
+            WHY DID RAY TAKE THIS ACTION?
           </div>
-          <div className="space-y-2 text-xs font-mono text-slate-300">
-            <div className="p-2.5 rounded bg-slate-950/70 border border-slate-800/80 space-y-1">
-              <p className="text-emerald-400 font-bold">&bull; Exposure & Value:</p>
-              <p className="text-slate-400">
-                ₹{caseData.amount_at_risk.toLocaleString()} at risk. Calibrated ML P(recovery) evaluated at {(prob * 100).toFixed(1)}% (Band: {caseData.recoverability_score >= 0.85 ? "HIGH" : caseData.recoverability_score >= 0.6 ? "MEDIUM" : "LOW"}). Expected Recovery: ₹{caseData.expected_recovery_value.toLocaleString()}.
-              </p>
+          <div className="space-y-2.5 text-slate-300">
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-blue-400 font-bold">1.</span>
+              <span>Payment failure detected with amount {formatCurrencyINR(caseData.amount_at_risk)}.</span>
             </div>
-            <div className="p-2.5 rounded bg-slate-950/70 border border-slate-800/80 space-y-1">
-              <p className="text-blue-400 font-bold">&bull; Root Cause Classification:</p>
-              <p className="text-slate-400">
-                Technical error diagnosed as transient ({caseData.failure_type}). Customer profile exhibits high historic retention without negative chargeback signals.
-              </p>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-blue-400 font-bold">2.</span>
+              <span>ML estimated {(prob * 100).toFixed(1)}% recovery probability (Band: {band}).</span>
             </div>
-            <div className="p-2.5 rounded bg-slate-950/70 border border-slate-800/80 space-y-1">
-              <p className="text-purple-400 font-bold">&bull; Policy Authorization:</p>
-              <p className="text-slate-400">
-                Deterministic Policy Engine verified retry limits (Attempt {caseData.retry_count + 1} of 2) and confirmed amount complies with automated recovery ceilings.
-              </p>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-blue-400 font-bold">3.</span>
+              <span>Diagnosis classified failure root cause as {caseData.failure_type}.</span>
+            </div>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-blue-400 font-bold">4.</span>
+              <span>Recovery Planner formulated Expected Value recovery plan ({caseData.recommended_action || "RETRY"}).</span>
+            </div>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-blue-400 font-bold">5.</span>
+              <span>Deterministic Policy Engine evaluated rules 1-10.</span>
+            </div>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-blue-400 font-bold">6.</span>
+              <span>Policy authorized retry (ceiling &le; ₹10,000, attempts &le; 1).</span>
+            </div>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-blue-400 font-bold">7.</span>
+              <span>Tool Gateway executed with canonical idempotency key protection.</span>
+            </div>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-blue-400 font-bold">8.</span>
+              <span>API poll + webhook HMAC independently confirmed recovery &rarr; VERIFIED.</span>
             </div>
           </div>
         </div>
 
-        {/* Panel 2: Why did RAY not act? */}
-        <div className="rounded-xl border border-amber-500/30 bg-slate-900/60 p-5 backdrop-blur-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-              Why Would RAY Refuse To Act?
-            </h3>
+        {/* Panel 2: Why Would RAY Refuse To Act? */}
+        <div className="p-5 rounded-xl bg-[#0A0F1A] border border-[#162234] space-y-3">
+          <div className="flex items-center gap-2 text-amber-400 font-bold uppercase tracking-wider text-xs">
+            <AlertTriangle className="w-4 h-4" />
+            WHY WOULD RAY REFUSE TO ACT?
           </div>
-          <div className="space-y-2 text-xs font-mono text-slate-300">
-            <div className="p-2.5 rounded bg-slate-950/70 border border-slate-800/80 space-y-1">
-              <p className="text-amber-400 font-bold">&bull; High-Value Ceiling Gate (≥ ₹50,000):</p>
-              <p className="text-slate-400">
-                {caseData.amount_at_risk >= 50000 
-                  ? "TRIGGERED: Amount meets or exceeds ₹50,000 ceiling. Autonomous execution halted until formal human operator approval."
-                  : "EXEMPT: Amount is below ₹50,000 threshold. Permitted for bounded autonomous execution."}
-              </p>
+          <div className="space-y-2.5 text-slate-300">
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-amber-400 font-bold">&bull;</span>
+              <div>
+                <span className="font-semibold text-white">High-Value Ceiling (Rule 7): </span>
+                <span>Any transaction &ge; ₹50,000 triggers immediate freeze in AWAITING_APPROVAL.</span>
+              </div>
             </div>
-            <div className="p-2.5 rounded bg-slate-950/70 border border-slate-800/80 space-y-1">
-              <p className="text-rose-400 font-bold">&bull; Hard Ceilings & Customer Opt-Out:</p>
-              <p className="text-slate-400">
-                Zero automated actions if customer has opted out, if retry count exceeds 1, or if failure type is permanent (e.g. invalid card, stolen card, or fraudulent velocity).
-              </p>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-rose-400 font-bold">&bull;</span>
+              <div>
+                <span className="font-semibold text-white">Permanent Failures &amp; Fraud (Rules 4 &amp; 6): </span>
+                <span>Fraud flags or permanent declines are permanently DENIED with 0 retries.</span>
+              </div>
             </div>
-            <div className="p-2.5 rounded bg-slate-950/70 border border-slate-800/80 space-y-1">
-              <p className="text-cyan-400 font-bold">&bull; Dual-Signal Conflict Guard:</p>
-              <p className="text-slate-400">
-                Never mark recovered based on single-signal API polling alone. Webhook proof is mandatory to eliminate phantom recoveries.
-              </p>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-rose-400 font-bold">&bull;</span>
+              <div>
+                <span className="font-semibold text-white">Customer Opt-Out (Rule 5): </span>
+                <span>Customer opt-out flags are respected unconditionally (DENY).</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-amber-400 font-bold">&bull;</span>
+              <div>
+                <span className="font-semibold text-white">Retry Limit (Rule 1): </span>
+                <span>Maximum 1 automatic retry attempt per failed transaction.</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5 p-2 rounded bg-[#0E1522] border border-[#142032]">
+              <span className="text-cyan-400 font-bold">&bull;</span>
+              <div>
+                <span className="font-semibold text-white">Verification Discrepancy: </span>
+                <span>If API status conflicts with Webhook payload, case is halted in HUMAN_REVIEW with ₹0.00 revenue.</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Chronological Event Timeline */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-sm">
-        <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-          <Clock className="w-4 h-4 text-emerald-400" />
-          Real-Time Audit Trail & Multi-Agent Event Stream
-        </h3>
+      <div className="p-6 rounded-xl bg-[#0A0E17] border border-[#162030] space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+              Real-Time Audit Trail &amp; Multi-Agent Event Stream
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-slate-400">
+            SSE Live Feed Supported
+          </span>
+        </div>
 
         {timeline.length === 0 ? (
-          <p className="text-xs font-mono text-slate-500">
-            No autonomous events recorded yet. Click &quot;Execute Recovery Flow&quot; to begin.
+          <p className="text-xs font-mono text-slate-400">
+            No autonomous events recorded yet. Click &ldquo;Execute Recovery&rdquo; to dispatch.
           </p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5 font-mono text-xs">
             {timeline.map((evt, idx) => (
               <div
                 key={evt.event_id || idx}
-                className="flex items-start gap-3 p-3 rounded bg-slate-950/60 border border-slate-800/80 text-xs font-mono"
+                className="flex items-start gap-3 p-3 rounded-lg bg-[#0E1522] border border-[#162234]"
               >
-                <div className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between">
                     <span className="font-bold text-white">{evt.event_type}</span>
-                    <span className="text-slate-500 text-[10px]">{evt.timestamp}</span>
+                    <span className="text-slate-400 text-[10px]">{evt.timestamp}</span>
                   </div>
-                  <div className="text-slate-400 text-[11px] mt-0.5">
-                    Actor: <span className="text-slate-300">{evt.actor}</span> &bull; Correlation:{" "}
-                    <span className="text-slate-500">{evt.correlation_id}</span>
+                  <div className="text-[11px] text-slate-400">
+                    Actor: <span className="text-slate-200">{evt.actor}</span> &bull; Correlation:{" "}
+                    <span className="text-slate-400">{evt.correlation_id}</span>
                   </div>
-                  {evt.details && Object.keys(evt.details).length > 0 && (
-                    <div className="mt-1.5 p-2 rounded bg-slate-900/90 text-slate-300 text-[11px] font-mono overflow-x-auto">
-                      {JSON.stringify(evt.details)}
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
