@@ -1,9 +1,9 @@
 {
-  "model_version": "ray-recov-v1-202609041738",
+  "model_version": "ray-recov-v1-202609050951",
   "model_type": "Logistic Regression + Sigmoid Calibration",
   "is_calibrated": true,
   "calibration_method": "sigmoid",
-  "training_timestamp": "2026-09-04T17:38:03.892510",
+  "training_timestamp": "2026-09-05T09:51:52.056708",
   "training_seed": 42,
   "dataset_version": "synthetic-50k-v1",
   "dataset_hash": "3596b33fcebecaa2",

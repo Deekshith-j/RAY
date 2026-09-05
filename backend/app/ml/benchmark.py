@@ -40,6 +40,7 @@ class ModeAblationResult(BaseModel):
     verification_rate_pct: float
     expected_recovery_sum: float
     net_economic_value: float
+    revenue_per_action: float = 0.0
 
 
 class AblationBenchmarkReport(BaseModel):
@@ -129,6 +130,7 @@ def run_ablation_benchmark(
         verification_rate_pct=100.0,
         expected_recovery_sum=round(total_at_risk * 0.5, 2),
         net_economic_value=a_net_val,
+        revenue_per_action=round(a_recovered / max(1, a_attempted), 2),
     )
 
     # -------------------------------------------------------------
@@ -208,6 +210,7 @@ def run_ablation_benchmark(
         verification_rate_pct=100.0,
         expected_recovery_sum=round(b_recovered, 2),
         net_economic_value=b_net_val,
+        revenue_per_action=round(b_recovered / max(1, b_attempted), 2),
     )
 
     # -------------------------------------------------------------
@@ -301,6 +304,7 @@ def run_ablation_benchmark(
         verification_rate_pct=100.0,
         expected_recovery_sum=round(float(c_expected_sum), 2),
         net_economic_value=c_net_val,
+        revenue_per_action=round(c_recovered / max(1, c_attempted), 2),
     )
 
     lift_over_base = round(c_recovered - a_recovered, 2)
@@ -339,6 +343,7 @@ def run_benchmark_cli():
     print(f"{'Actions Attempted':<32} | {report.baseline_naive.actions_attempted:<16} | {report.rule_based_ray.actions_attempted:<16} | {report.ml_assisted_ray.actions_attempted:<16}")
     print(f"{'Successful Recoveries':<32} | {report.baseline_naive.successful_recoveries:<16} | {report.rule_based_ray.successful_recoveries:<16} | {report.ml_assisted_ray.successful_recoveries:<16}")
     print(f"{'Revenue Recovered':<32} | INR {report.baseline_naive.revenue_recovered:<11,.0f} | INR {report.rule_based_ray.revenue_recovered:<11,.0f} | INR {report.ml_assisted_ray.revenue_recovered:<11,.0f}")
+    print(f"{'Revenue / Action Attempted':<32} | INR {report.baseline_naive.revenue_per_action:<11,.0f} | INR {report.rule_based_ray.revenue_per_action:<11,.0f} | INR {report.ml_assisted_ray.revenue_per_action:<11,.0f}")
     print(f"{'Recovery Rate':<32} | {report.baseline_naive.recovery_rate_pct:<15.1f}% | {report.rule_based_ray.recovery_rate_pct:<15.1f}% | {report.ml_assisted_ray.recovery_rate_pct:<15.1f}%")
     print(f"{'Case Recall':<32} | {report.baseline_naive.case_recall_pct:<15.1f}% | {report.rule_based_ray.case_recall_pct:<15.1f}% | {report.ml_assisted_ray.case_recall_pct:<15.1f}%")
     print(f"{'Revenue-Weighted Recall':<32} | {report.baseline_naive.revenue_weighted_recall_pct:<15.1f}% | {report.rule_based_ray.revenue_weighted_recall_pct:<15.1f}% | {report.ml_assisted_ray.revenue_weighted_recall_pct:<15.1f}%")
@@ -349,7 +354,8 @@ def run_benchmark_cli():
     print("-" * 88)
     print(f"\nECONOMIC LIFT:")
     print(f"  ML-Assisted vs Baseline:   +INR {report.ml_lift_over_baseline_inr:,.2f} (+{report.ml_lift_over_baseline_pct}%)")
-    print(f"  False Intervention Reduction: {report.rule_based_ray.false_interventions - report.ml_assisted_ray.false_interventions} fewer wasted attempts (-{report.ml_efficiency_lift_pct}%)")
+    print(f"  Unit Efficiency Gain:      +INR {report.ml_assisted_ray.revenue_per_action - report.rule_based_ray.revenue_per_action:,.2f} more revenue recovered per attempted action")
+    print(f"  False Intervention Cut:    {report.rule_based_ray.false_interventions - report.ml_assisted_ray.false_interventions} fewer wasted attempts (-{report.ml_efficiency_lift_pct}%)")
     print("=" * 80)
 
 

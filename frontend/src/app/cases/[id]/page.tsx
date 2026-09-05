@@ -150,6 +150,18 @@ export default function CaseDetailPage() {
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Cases Ledger
         </Link>
 
+        {/* Autonomous Financial Control Banner */}
+        <div className="mb-5 bg-slate-900/90 border border-emerald-500/20 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono shadow-lg shadow-emerald-950/20">
+          <div className="flex items-center gap-2 text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-emerald-300 font-bold uppercase tracking-wider text-[11px]">System Invariant:</span>
+            <span className="text-slate-400 text-[11px] hidden md:inline">Prediction ≠ Recommendation ≠ Authorization ≠ Execution ≠ Verification</span>
+          </div>
+          <div className="text-slate-400 text-[11px]">
+            <span className="text-emerald-400 font-semibold">&ldquo;AI is capable enough to recommend. The system is constrained enough to trust.&rdquo;</span>
+          </div>
+        </div>
+
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
           <div>
             <div className="flex items-center gap-3 mb-1">

@@ -173,6 +173,21 @@ async def run_judge_demo():
         print("[5/5] Policy Engine")
         print("      Decision: REQUIRE_HUMAN_APPROVAL (₹75,000 >= ₹50,000 ceiling)")
         print(f"      Execution Halted: {case_2.state.value} (Zero provider operations)")
+        print("\n      ┌──────────────────────────────────────────────┐")
+        print("      │ KILLER MOMENT: SYSTEM INTEGRITY CONTRAST     │")
+        print("      │ AI → RETRY                                  │")
+        print("      │       ↓                                      │")
+        print("      │ POLICY ENGINE                                │")
+        print("      │       ↓                                      │")
+        print("      │ ⚠ ₹75,000 (Exceeds ₹50,000 ceiling)          │")
+        print("      │       ↓                                      │")
+        print("      │ HUMAN APPROVAL REQUIRED                      │")
+        print("      │       ↓                                      │")
+        print("      │ TOOL GATEWAY BLOCKED (0 Executions)          │")
+        print("      ├──────────────────────────────────────────────┤")
+        print("      │ 'AI is capable enough to recommend.          │")
+        print("      │  The system is constrained enough to trust.' │")
+        print("      └──────────────────────────────────────────────┘")
 
         print("\n      [OPERATOR SIGN-OFF] Risk Lead approves transaction...")
         decision = await session.get(RecoveryDecision, res_2["decision_id"])
@@ -180,8 +195,13 @@ async def run_judge_demo():
         decision.authorized_by = "risk_lead@enterprise.com"
         case_2.state = RecoveryState.EXECUTING
 
+        from sqlalchemy import delete
+        import uuid
+        await session.execute(delete(HumanApprovalRecord).where(HumanApprovalRecord.case_id == case_2_id))
+        await session.commit()
+
         approval = HumanApprovalRecord(
-            approval_id="appr_judge_001",
+            approval_id=f"appr_{case_2_id}_{uuid.uuid4().hex[:8]}",
             case_id=case_2_id,
             decision_id=decision.id,
             operator_id="risk_lead@enterprise.com",
